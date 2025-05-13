@@ -1,0 +1,10 @@
+name: Local Test Deploy-Sub
+
+on: push
+
+jobs:
+  call-deploy-sub:
+    uses: ./interop-core-deployment/.github/workflows/deploy-sub.yaml
+    with:
+      environment: qa            
+      timeout_seconds: 120       
