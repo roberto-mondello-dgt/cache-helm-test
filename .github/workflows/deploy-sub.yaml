@@ -1,0 +1,118 @@
+name: Deploy (sub) with Cache and Chart.yaml Control
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Environment to run apply against'
+        required: true
+        type: string
+      timeout_seconds:
+        description: 'Kubectl apply wait timeout in seconds for Deployments'
+        required: true
+        type: number
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to run apply against'
+        required: true
+        type: string
+      timeout_seconds:
+        description: 'Kubectl apply wait timeout in seconds for Deployments'
+        required: true
+        type: number
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  SCRIPTS_FOLDER: "./interop-infra-commons/scripts/helm"
+
+jobs:
+  workflow_setup:
+    name: Setup steps
+    runs-on: [ self-hosted, "run_id:${{ inputs.environment }}-${{ github.run_id }}" ]
+    environment: ${{ inputs.environment }}
+    env:
+      TARGET_ENVIRONMENT: ${{ inputs.environment }}
+    outputs:
+      microservices: ${{ steps.set-outputs.outputs.microservices }}
+      cronjobs: ${{ steps.set-outputs.outputs.cronjobs }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Set outputs
+        id: set-outputs
+        run: |
+          echo "microservices=$(find microservices -type f -path \"*/$TARGET_ENVIRONMENT/values.yaml\" -exec dirname {} \; | awk -F'/' '{print $2}' | jq -R -s -c 'split("\n")[:-1]'))" >> "$GITHUB_OUTPUT"
+          echo "cronjobs=$(find jobs -type f -path \"*/$TARGET_ENVIRONMENT/values.yaml\" -exec dirname {} \; | awk -F'/' '{print $2}' | jq -R -s -c 'split("\n")[:-1]'))" >> "$GITHUB_OUTPUT"
+
+  deploy_common_configmaps:
+    name: Deploy Common Configmaps
+    needs: [ workflow_setup ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Commons Configmaps Deploy
+        run: |
+          echo "deploy issued: commons configmaps"
+
+  deploy_ms:
+    name: Deploy Microservice ${{ matrix.microservice }}
+    needs: [ workflow_setup, deploy_common_configmaps ]
+    if: ${{ ! contains(needs.workflow_setup.outputs.microservices, '[]') }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        microservice: ${{ fromJson(needs.workflow_setup.outputs.microservices) }}
+      fail-fast: false
+    steps:
+      - name: Detect Chart.yaml changes
+        id: detect_chart_ms
+        run: |
+          GLOBAL=$(git diff --name-only HEAD~1 HEAD | grep -E "Chart.yaml$" | wc -l)
+          if [ "$GLOBAL" -gt 0 ] || git diff --name-only HEAD~1 HEAD | grep -q "microservices/${{ matrix.microservice }}/Chart.yaml"; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip if no Chart.yaml change
+        if: steps.detect_chart_ms.outputs.changed == 'false'
+        run: |
+          echo "no deploy: ws unchanged for ${{ matrix.microservice }}"
+
+      - name: Notify Microservice Deploy
+        if: steps.detect_chart_ms.outputs.changed == 'true'
+        run: |
+          echo "deploy issued: microservice ${{ matrix.microservice }}"
+
+  deploy_cj:
+    name: Deploy Cronjob ${{ matrix.cronjob }}
+    needs: [ workflow_setup, deploy_common_configmaps ]
+    if: ${{ ! contains(needs.workflow_setup.outputs.cronjobs, '[]') }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        cronjob: ${{ fromJson(needs.workflow_setup.outputs.cronjobs) }}
+      fail-fast: false
+    steps:
+      - name: Detect Chart.yaml changes for cronjob
+        id: detect_chart_cj
+        run: |
+          GLOBAL=$(git diff --name-only HEAD~1 HEAD | grep -E "Chart.yaml$" | wc -l)
+          if [ "$GLOBAL" -gt 0 ] || git diff --name-only HEAD~1 HEAD | grep -q "jobs/${{ matrix.cronjob }}/Chart.yaml"; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip if no Chart.yaml change
+        if: steps.detect_chart_cj.outputs.changed == 'false'
+        run: |
+          echo "no deploy: ws unchanged for cronjob ${{ matrix.cronjob }}"
+
+      - name: Notify Cronjob Deploy
+        if: steps.detect_chart_cj.outputs.changed == 'true'
+        run: |
+          echo "deploy issued: cronjob ${{ matrix.cronjob }}"
