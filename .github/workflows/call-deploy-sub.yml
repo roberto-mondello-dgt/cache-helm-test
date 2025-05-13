@@ -1,6 +1,6 @@
 name: Local Test Deploy-Sub
 
-on: push
+on: workflow_dispatch
 
 jobs:
   call-deploy-sub:
