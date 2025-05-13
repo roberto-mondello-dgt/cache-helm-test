@@ -1,24 +1,14 @@
-name: Deploy (sub) with Cache
+name: Deploy (sub)
 
 on: 
-  workflow_call:
-    inputs:
-      environment:
-        description: 'Environment to run apply against'
-        required: true
-        type: string
-      timeout_seconds:
-        description: 'Kubectl apply wait timeout in seconds for Deployments'
-        required: true
-        type: number
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Environment to run apply against'
+        description: 'Environment to simulate deploy against'
         required: true
         type: string
       timeout_seconds:
-        description: 'Kubectl apply wait timeout in seconds for Deployments'
+        description: 'Simulation timeout in seconds'
         required: true
         type: number
 
@@ -26,80 +16,96 @@ defaults:
   run:
     shell: bash
 
-jobs:
+env:
+  SCRIPTS_FOLDER: "./interop-infra-commons/scripts/helm"
+
+jobs:  
   workflow_setup:
-    name: Setup steps
+    name: Setup Steps
     runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
     outputs:
       microservices: ${{ steps.set-outputs.outputs.microservices }}
       cronjobs: ${{ steps.set-outputs.outputs.cronjobs }}
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v3
         with:
+          repository: roberto-mondello-dgt/cache-helm-test
           fetch-depth: 0
+
+      - id: calculate-hash
+        run: |
+          hash=$(find . -type f \( -name 'Chart.yaml' -o -path './microservices/*' -o -path './jobs/*' \) -exec sha256sum {} \; | sort | sha256sum | awk '{print $1}')
+          echo "hash=$hash" >> "$GITHUB_OUTPUT"
+          echo "Computed Hash: $hash"
+
+      - name: Restore Cache
+        uses: actions/cache@v3
+        id: cache-restore
+        with:
+          path: /tmp/cache
+          key: Linux-simulation-${{ inputs.environment }}-${{ steps.calculate-hash.outputs.hash }}
+
       - id: set-outputs
         run: |
-          echo "microservices=$(find microservices -type f -path '*/${{ inputs.environment }}/values.yaml' -exec dirname {} \; | awk -F'/' '{print $2}' | jq -R -s -c 'split("\n")[:-1]'))" >> "$GITHUB_OUTPUT"
-          echo "cronjobs=$(find jobs -type f -path '*/${{ inputs.environment }}/values.yaml' -exec dirname {} \; | awk -F'/' '{print $2}' | jq -R -s -c 'split("\n")[:-1]'))" >> "$GITHUB_OUTPUT"
+          if [ -d "microservices" ]; then
+            microservices=$(find microservices -type f -path "*/${{ inputs.environment }}/values.yaml" -exec dirname {} \; | awk -F'/' '{print $2}' | jq -R -s -c 'split("\n")[:-1]')
+          else
+            microservices="[]"
+          fi
+          echo "microservices=$microservices" >> "$GITHUB_OUTPUT"
 
-  deploy_common_configmaps:
-    name: Deploy Common Configmaps
-    needs: workflow_setup
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - id: cache-commons
-        name: Cache commons charts
+          if [ -d "jobs" ]; then
+            cronjobs=$(find jobs -type f -path "*/${{ inputs.environment }}/values.yaml" -exec dirname {} \; | awk -F'/' '{print $2}' | jq -R -s -c 'split("\n")[:-1]')
+          else
+            cronjobs="[]"
+          fi
+          echo "cronjobs=$cronjobs" >> "$GITHUB_OUTPUT"
+
+      - name: Save Cache
+        if: steps.cache-restore.outputs.cache-hit != 'true'
         uses: actions/cache@v3
         with:
-          path: /tmp/cache/commons
-          key: ${{ runner.os }}-commons-${{ inputs.environment }}-${{ hashFiles('commons/**/Chart.yaml') }}
-      - name: Notify commons deploy
-        run: |
-          echo "deploy issued: commons configmaps (cache-hit=${{ steps.cache-commons.outputs.cache-hit }})"
+          path: /tmp/cache
+          key: Linux-simulation-${{ inputs.environment }}-${{ steps.calculate-hash.outputs.hash }}
 
-  deploy_ms:
-    name: Deploy Microservice ${{ matrix.microservice }}
-    needs: [workflow_setup, deploy_common_configmaps]
-    if: ${{ ! contains(needs.workflow_setup.outputs.microservices, '[]') }}
+  simulate_microservices:
+    name: Simulate Microservice Deploy - ${{ matrix.microservice }}
+    needs: workflow_setup
     runs-on: ubuntu-latest
+    if: ${{ ! contains(needs.workflow_setup.outputs.microservices, '[]') }}
     strategy:
       matrix:
         microservice: ${{ fromJson(needs.workflow_setup.outputs.microservices) }}
-      fail-fast: false
     steps:
-      - name: Checkout
+      - name: Checkout Code
         uses: actions/checkout@v3
-      - id: cache-ms
-        name: Cache microservice chart
-        uses: actions/cache@v3
         with:
-          path: /tmp/cache/ms-${{ matrix.microservice }}
-          key: ${{ runner.os }}-ms-${{ inputs.environment }}-${{ matrix.microservice }}-${{ hashFiles(format('microservices/{0}/Chart.yaml', matrix.microservice)) }}
-      - name: Notify microservice deploy
-        run: |
-          echo "deploy issued: microservice ${{ matrix.microservice }} (cache-hit=${{ steps.cache-ms.outputs.cache-hit }})"
+          repository: roberto-mondello-dgt/cache-helm-test
+          fetch-depth: 0
 
-  deploy_cj:
-    name: Deploy Cronjob ${{ matrix.cronjob }}
-    needs: [workflow_setup, deploy_common_configmaps]
-    if: ${{ ! contains(needs.workflow_setup.outputs.cronjobs, '[]') }}
+      - name: Simulate Microservice Deploy
+        run: |
+          echo "::info::Simulating deploy for microservice: ${{ matrix.microservice }}"
+          echo "::info::This is a dry run. No real deployment executed."
+
+  simulate_cronjobs:
+    name: Simulate Cronjob Deploy - ${{ matrix.cronjob }}
+    needs: workflow_setup
     runs-on: ubuntu-latest
+    if: ${{ ! contains(needs.workflow_setup.outputs.cronjobs, '[]') }}
     strategy:
       matrix:
         cronjob: ${{ fromJson(needs.workflow_setup.outputs.cronjobs) }}
-      fail-fast: false
     steps:
-      - name: Checkout
+      - name: Checkout Code
         uses: actions/checkout@v3
-      - id: cache-cj
-        name: Cache cronjob chart
-        uses: actions/cache@v3
         with:
-          path: /tmp/cache/cj-${{ matrix.cronjob }}
-          key: ${{ runner.os }}-cj-${{ inputs.environment }}-${{ matrix.cronjob }}-${{ hashFiles(format('jobs/{0}/Chart.yaml', matrix.cronjob)) }}
-      - name: Notify cronjob deploy
+          repository: roberto-mondello-dgt/cache-helm-test
+          fetch-depth: 0
+
+      - name: Simulate Cronjob Deploy
         run: |
-          echo "deploy issued: cronjob ${{ matrix.cronjob }} (cache-hit=${{ steps.cache-cj.outputs.cache-hit }})"
+          echo "::info::Simulating deploy for cronjob: ${{ matrix.cronjob }}"
+          echo "::info::This is a dry run. No real deployment executed."
