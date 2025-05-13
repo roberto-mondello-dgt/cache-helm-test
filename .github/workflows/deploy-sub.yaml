@@ -1,6 +1,6 @@
-name: Deploy (sub) with Cache and Chart.yaml Control
+name: Deploy (sub) with Cache
 
-on:
+on: 
   workflow_call:
     inputs:
       environment:
@@ -26,40 +26,43 @@ defaults:
   run:
     shell: bash
 
-env:
-  SCRIPTS_FOLDER: "./interop-infra-commons/scripts/helm"
-
 jobs:
   workflow_setup:
     name: Setup steps
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
-    env:
-      TARGET_ENVIRONMENT: ${{ inputs.environment }}
     outputs:
       microservices: ${{ steps.set-outputs.outputs.microservices }}
       cronjobs: ${{ steps.set-outputs.outputs.cronjobs }}
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v3
-      - name: Set outputs
-        id: set-outputs
+        with:
+          fetch-depth: 0
+      - id: set-outputs
         run: |
-          echo "microservices=$(find microservices -type f -path \"*/$TARGET_ENVIRONMENT/values.yaml\" -exec dirname {} \; | awk -F'/' '{print $2}' | jq -R -s -c 'split("\n")[:-1]'))" >> "$GITHUB_OUTPUT"
-          echo "cronjobs=$(find jobs -type f -path \"*/$TARGET_ENVIRONMENT/values.yaml\" -exec dirname {} \; | awk -F'/' '{print $2}' | jq -R -s -c 'split("\n")[:-1]'))" >> "$GITHUB_OUTPUT"
+          echo "microservices=$(find microservices -type f -path '*/${{ inputs.environment }}/values.yaml' -exec dirname {} \; | awk -F'/' '{print $2}' | jq -R -s -c 'split("\n")[:-1]'))" >> "$GITHUB_OUTPUT"
+          echo "cronjobs=$(find jobs -type f -path '*/${{ inputs.environment }}/values.yaml' -exec dirname {} \; | awk -F'/' '{print $2}' | jq -R -s -c 'split("\n")[:-1]'))" >> "$GITHUB_OUTPUT"
 
   deploy_common_configmaps:
     name: Deploy Common Configmaps
-    needs: [ workflow_setup ]
+    needs: workflow_setup
     runs-on: ubuntu-latest
     steps:
-      - name: Notify Commons Configmaps Deploy
+      - name: Checkout
+        uses: actions/checkout@v3
+      - id: cache-commons
+        name: Cache commons charts
+        uses: actions/cache@v3
+        with:
+          path: /tmp/cache/commons
+          key: ${{ runner.os }}-commons-${{ inputs.environment }}-${{ hashFiles('commons/**/Chart.yaml') }}
+      - name: Notify commons deploy
         run: |
-          echo "deploy issued: commons configmaps"
+          echo "deploy issued: commons configmaps (cache-hit=${{ steps.cache-commons.outputs.cache-hit }})"
 
   deploy_ms:
     name: Deploy Microservice ${{ matrix.microservice }}
-    needs: [ workflow_setup, deploy_common_configmaps ]
+    needs: [workflow_setup, deploy_common_configmaps]
     if: ${{ ! contains(needs.workflow_setup.outputs.microservices, '[]') }}
     runs-on: ubuntu-latest
     strategy:
@@ -67,29 +70,21 @@ jobs:
         microservice: ${{ fromJson(needs.workflow_setup.outputs.microservices) }}
       fail-fast: false
     steps:
-      - name: Detect Chart.yaml changes
-        id: detect_chart_ms
+      - name: Checkout
+        uses: actions/checkout@v3
+      - id: cache-ms
+        name: Cache microservice chart
+        uses: actions/cache@v3
+        with:
+          path: /tmp/cache/ms-${{ matrix.microservice }}
+          key: ${{ runner.os }}-ms-${{ inputs.environment }}-${{ matrix.microservice }}-${{ hashFiles(format('microservices/{0}/Chart.yaml', matrix.microservice)) }}
+      - name: Notify microservice deploy
         run: |
-          GLOBAL=$(git diff --name-only HEAD~1 HEAD | grep -E "Chart.yaml$" | wc -l)
-          if [ "$GLOBAL" -gt 0 ] || git diff --name-only HEAD~1 HEAD | grep -q "microservices/${{ matrix.microservice }}/Chart.yaml"; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Skip if no Chart.yaml change
-        if: steps.detect_chart_ms.outputs.changed == 'false'
-        run: |
-          echo "no deploy: ws unchanged for ${{ matrix.microservice }}"
-
-      - name: Notify Microservice Deploy
-        if: steps.detect_chart_ms.outputs.changed == 'true'
-        run: |
-          echo "deploy issued: microservice ${{ matrix.microservice }}"
+          echo "deploy issued: microservice ${{ matrix.microservice }} (cache-hit=${{ steps.cache-ms.outputs.cache-hit }})"
 
   deploy_cj:
     name: Deploy Cronjob ${{ matrix.cronjob }}
-    needs: [ workflow_setup, deploy_common_configmaps ]
+    needs: [workflow_setup, deploy_common_configmaps]
     if: ${{ ! contains(needs.workflow_setup.outputs.cronjobs, '[]') }}
     runs-on: ubuntu-latest
     strategy:
@@ -97,22 +92,14 @@ jobs:
         cronjob: ${{ fromJson(needs.workflow_setup.outputs.cronjobs) }}
       fail-fast: false
     steps:
-      - name: Detect Chart.yaml changes for cronjob
-        id: detect_chart_cj
+      - name: Checkout
+        uses: actions/checkout@v3
+      - id: cache-cj
+        name: Cache cronjob chart
+        uses: actions/cache@v3
+        with:
+          path: /tmp/cache/cj-${{ matrix.cronjob }}
+          key: ${{ runner.os }}-cj-${{ inputs.environment }}-${{ matrix.cronjob }}-${{ hashFiles(format('jobs/{0}/Chart.yaml', matrix.cronjob)) }}
+      - name: Notify cronjob deploy
         run: |
-          GLOBAL=$(git diff --name-only HEAD~1 HEAD | grep -E "Chart.yaml$" | wc -l)
-          if [ "$GLOBAL" -gt 0 ] || git diff --name-only HEAD~1 HEAD | grep -q "jobs/${{ matrix.cronjob }}/Chart.yaml"; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Skip if no Chart.yaml change
-        if: steps.detect_chart_cj.outputs.changed == 'false'
-        run: |
-          echo "no deploy: ws unchanged for cronjob ${{ matrix.cronjob }}"
-
-      - name: Notify Cronjob Deploy
-        if: steps.detect_chart_cj.outputs.changed == 'true'
-        run: |
-          echo "deploy issued: cronjob ${{ matrix.cronjob }}"
+          echo "deploy issued: cronjob ${{ matrix.cronjob }} (cache-hit=${{ steps.cache-cj.outputs.cache-hit }})"
