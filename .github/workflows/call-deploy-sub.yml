@@ -1,10 +1,22 @@
+
 name: Local Test Deploy-Sub
 
-on: workflow_dispatch
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to run apply against'
+        required: true
+        default: 'qa'
+      timeout_seconds:
+        description: 'Kubectl apply wait timeout in seconds for Deployments'
+        required: true
+        default: 150
 
 jobs:
   call-deploy-sub:
     uses: ./interop-core-deployment/.github/workflows/deploy-sub.yaml
     with:
-      environment: qa            
-      timeout_seconds: 120       
+      environment: ${{ github.event.inputs.environment }}
+      timeout_seconds: ${{ github.event.inputs.timeout_seconds }}
+    secrets: inherit
