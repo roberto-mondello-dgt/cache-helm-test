@@ -18,6 +18,8 @@ defaults:
 
 env:
   SCRIPTS_FOLDER: "./interop-infra-commons/scripts/helm"
+  HELM_REPO_URL: "https://pagopa.github.io/"  # REPO PUBBLICO DELLE CHARTS
+  HELM_REPO_NAME: "interop-charts"
 
 jobs:  
   workflow_setup:
@@ -45,7 +47,19 @@ jobs:
         id: cache-restore
         with:
           path: /tmp/cache
-          key: Linux-simulation-${{ inputs.environment }}-${{ steps.calculate-hash.outputs.hash }}
+          key: simulation-${{ inputs.environment }}-${{ steps.calculate-hash.outputs.hash }}
+
+      - name: Pull and Extract Charts if Cache Miss
+        if: steps.cache-restore.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p /tmp/cache
+          charts=$(yq '.dependencies[].repository + " " + .dependencies[].name + " " + .dependencies[].version' Chart.yaml | paste - - -)
+          while IFS=$'\t' read -r repo name version; do
+            echo "Pulling chart $name version $version from $repo"
+            helm repo add temp-repo $repo || true
+            helm pull temp-repo/$name --version $version --destination /tmp/cache
+            tar -xzf /tmp/cache/$name-$version.tgz -C /tmp/cache/
+          done <<< "$charts"
 
       - id: set-outputs
         run: |
@@ -68,7 +82,15 @@ jobs:
         uses: actions/cache@v3
         with:
           path: /tmp/cache
-          key: Linux-simulation-${{ inputs.environment }}-${{ steps.calculate-hash.outputs.hash }}
+          key: simulation-${{ inputs.environment }}-${{ steps.calculate-hash.outputs.hash }}
+
+      - name: Cache Status
+        run: |
+          if [ "${{ steps.cache-restore.outputs.cache-hit }}" == "true" ]; then
+            echo "::info::Deploy with cache"
+          else
+            echo "::info::Deploy without cache"
+          fi
 
   simulate_microservices:
     name: Simulate Microservice Deploy - ${{ matrix.microservice }}
