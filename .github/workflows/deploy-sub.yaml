@@ -54,8 +54,8 @@ jobs:
           CHART_FILE="./interop-core-deployment/Chart.yaml"
 
           if [ -f "$CHART_FILE" ]; then
-            charts=$(yq '.dependencies[] | .repository + " " + .name + " " + .version' "$CHART_FILE" | paste - - -)
-            while IFS=$'\t' read -r repo name version; do
+            charts=$(yq -r '.dependencies[] | .repository + "|" + .name + "|" + .version' "$CHART_FILE")
+            while IFS='|' read -r repo name version; do
               echo "Processing chart: $name version: $version from $repo"
 
               if [ ! -f "/tmp/cache/$name-$version.tgz" ]; then
@@ -77,6 +77,7 @@ jobs:
           else
             echo "Chart.yaml not found at $CHART_FILE. Skipping chart processing."
           fi
+
 
       - id: set-outputs
         run: |
