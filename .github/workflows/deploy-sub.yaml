@@ -53,7 +53,9 @@ jobs:
         if: steps.cache-restore.outputs.cache-hit != 'true'
         run: |
           mkdir -p /tmp/cache
-          charts=$(yq '.dependencies[].repository + " " + .dependencies[].name + " " + .dependencies[].version' ./interop-core-deployment/Chart.yaml | paste - - -)
+          cd $GITHUB_WORKSPACE  # Ti assicura di essere nella directory del repo.
+
+          charts=$(yq '.dependencies[].repository + " " + .dependencies[].name + " " + .dependencies[].version' Chart.yaml | paste - - -)
           while IFS=$'\t' read -r repo name version; do
             echo "Pulling chart $name version $version from $repo"
             helm repo add temp-repo $repo || true
