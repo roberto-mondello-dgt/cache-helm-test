@@ -15,7 +15,7 @@ on:
 defaults:
   run:
     shell: bash
-    working-directory: ./cache-helm-test/interop-core-deployment
+    working-directory: ./interop-core-deployment
 
 env:
   SCRIPTS_FOLDER: "./interop-infra-commons/scripts/helm"
@@ -51,8 +51,8 @@ jobs:
       - name: Download and Extract Charts
         run: |
           mkdir -p /tmp/cache
-
           CHART_FILE="./interop-core-deployment/Chart.yaml"
+
           if [ -f "$CHART_FILE" ]; then
             charts=$(yq '.dependencies[] | .repository + " " + .name + " " + .version' "$CHART_FILE" | paste - - -)
             while IFS=$'\t' read -r repo name version; do
@@ -77,7 +77,6 @@ jobs:
           else
             echo "Chart.yaml not found at $CHART_FILE. Skipping chart processing."
           fi
-        shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
 
       - id: set-outputs
         run: |
@@ -106,7 +105,7 @@ jobs:
     name: Simulate Microservice Deploy - ${{ matrix.microservice }}
     needs: workflow_setup
     runs-on: ubuntu-latest
-    if: ${{ needs.workflow_setup.outputs.microservices != '[]' }}
+    if: ${{ ! contains(needs.workflow_setup.outputs.microservices, '[]') }}
     strategy:
       matrix:
         microservice: ${{ fromJson(needs.workflow_setup.outputs.microservices) }}
@@ -126,7 +125,7 @@ jobs:
     name: Simulate Cronjob Deploy - ${{ matrix.cronjob }}
     needs: workflow_setup
     runs-on: ubuntu-latest
-    if: ${{ needs.workflow_setup.outputs.cronjobs != '[]' }}
+    if: ${{ ! contains(needs.workflow_setup.outputs.cronjobs, '[]') }}
     strategy:
       matrix:
         cronjob: ${{ fromJson(needs.workflow_setup.outputs.cronjobs) }}
