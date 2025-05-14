@@ -46,7 +46,7 @@ jobs:
         id: cache-restore
         with:
           path: /tmp/cache
-          key: simulation-${{ inputs.environment }}-${{ steps.calculate-hash.outputs.hash }}
+          key: simulation-v2-${{ inputs.environment }}-${{ steps.calculate-hash.outputs.hash }}
 
       - name: Download and Extract Charts
         run: |
