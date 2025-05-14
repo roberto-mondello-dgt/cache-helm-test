@@ -15,7 +15,7 @@ on:
 defaults:
   run:
     shell: bash
-    working-directory: ./interop-core-deployment
+    working-directory: ./cache-helm-test/interop-core-deployment
 
 env:
   SCRIPTS_FOLDER: "./interop-infra-commons/scripts/helm"
