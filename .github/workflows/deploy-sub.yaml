@@ -52,27 +52,30 @@ jobs:
         run: |
           mkdir -p /tmp/cache
 
-          if [ -f "Chart.yaml" ]; then
-            charts=$(yq '.dependencies[] | .repository + " " + .name + " " + .version' Chart.yaml | paste - - -)
+          CHART_FILE="./interop-core-deployment/Chart.yaml"
+          if [ -f "$CHART_FILE" ]; then
+            charts=$(yq '.dependencies[] | .repository + " " + .name + " " + .version' "$CHART_FILE" | paste - - -)
             while IFS=$'\t' read -r repo name version; do
               echo "Processing chart: $name version: $version from $repo"
 
               if [ ! -f "/tmp/cache/$name-$version.tgz" ]; then
-                echo "Downloading chart: $name-$version.tgz"
-                curl -sSL "$repo/$name-$version.tgz" -o "/tmp/cache/$name-$version.tgz"
+                echo "Downloading chart: $name-$version.tgz using Helm"
+                helm repo add temp-repo "$repo" --force-update >/dev/null 2>&1 || true
+                helm pull temp-repo/$name --version "$version" --destination /tmp/cache/ || true
+                helm repo remove temp-repo >/dev/null 2>&1 || true
               else
                 echo "Chart $name-$version already in cache, skipping download."
               fi
 
               if [ ! -d "/tmp/cache/$name" ]; then
                 echo "Extracting chart: $name-$version.tgz"
-                tar -xzf "/tmp/cache/$name-$version.tgz" -C /tmp/cache/
+                tar -xzf "/tmp/cache/$name-$version.tgz" -C /tmp/cache/ || true
               else
                 echo "Chart $name already extracted, skipping."
               fi
             done <<< "$charts"
           else
-            echo "Chart.yaml not found. Skipping chart processing."
+            echo "Chart.yaml not found at $CHART_FILE. Skipping chart processing."
           fi
         shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
 
@@ -103,7 +106,7 @@ jobs:
     name: Simulate Microservice Deploy - ${{ matrix.microservice }}
     needs: workflow_setup
     runs-on: ubuntu-latest
-    if: ${{ ! contains(needs.workflow_setup.outputs.microservices, '[]') }}
+    if: ${{ needs.workflow_setup.outputs.microservices != '[]' }}
     strategy:
       matrix:
         microservice: ${{ fromJson(needs.workflow_setup.outputs.microservices) }}
@@ -123,7 +126,7 @@ jobs:
     name: Simulate Cronjob Deploy - ${{ matrix.cronjob }}
     needs: workflow_setup
     runs-on: ubuntu-latest
-    if: ${{ ! contains(needs.workflow_setup.outputs.cronjobs, '[]') }}
+    if: ${{ needs.workflow_setup.outputs.cronjobs != '[]' }}
     strategy:
       matrix:
         cronjob: ${{ fromJson(needs.workflow_setup.outputs.cronjobs) }}
