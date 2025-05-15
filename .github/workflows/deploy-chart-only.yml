@@ -1,0 +1,74 @@
+name: Deploy - Simple
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to run apply against'
+        required: true
+        type: string
+      timeout_seconds:
+        description: 'Timeout in seconds'
+        required: true
+        type: number
+
+defaults:
+  run:
+    shell: bash
+    working-directory: .
+
+jobs:
+  chart_cache_and_dummy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+        with:
+          repository: roberto-mondello-dgt/cache-helm-test
+          fetch-depth: 0
+
+      - name: Check Chart Hash
+        id: check-chart
+        run: |
+          if [ -f "Chart.yaml" ]; then
+            chart_hash=$(sha256sum Chart.yaml | awk '{print $1}')
+          else
+            chart_hash="none"
+          fi
+          echo "chart_hash=$chart_hash" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare Cache Directory
+        run: mkdir -p /tmp/cache
+
+      - name: Restore Cache
+        uses: actions/cache@v3
+        id: cache-restore
+        with:
+          path: /tmp/cache
+          key: cache-${{ inputs.environment }}-chart-${{ steps.check-chart.outputs.chart_hash }}
+
+      - name: Build and Cache Dummy Helm Chart
+        if: steps.cache-restore.outputs.cache-hit != 'true' && steps.check-chart.outputs.chart_hash != 'none'
+        run: |
+          echo "::info::Chart.yaml has changed. Building dummy Helm chart."
+
+          mkdir -p dummy-chart
+          cat <<EOF > dummy-chart/Chart.yaml
+          apiVersion: v2
+          name: dummy-service
+          version: 0.1.0
+          appVersion: "1.0"
+          EOF
+
+          mkdir -p dummy-chart/templates
+          echo "---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: dummy-config\n" > dummy-chart/templates/configmap.yaml
+
+          helm dependency build dummy-chart
+          helm package dummy-chart -d /tmp/cache
+
+      - name: Save Cache
+        if: steps.cache-restore.outputs.cache-hit != 'true'
+        uses: actions/cache@v3
+        with:
+          path: /tmp/cache
+          key: cache-${{ inputs.environment }}-chart-${{ steps.check-chart.outputs.chart_hash }}
