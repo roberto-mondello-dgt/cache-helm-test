@@ -1,0 +1,109 @@
+name: Deploy - Simple
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to run apply against'
+        required: true
+        type: string
+      timeout_seconds:
+        description: 'Timeout in seconds'
+        required: true
+        type: number
+
+defaults:
+  run:
+    shell: bash
+    working-directory: .
+jobs:
+  workflow_setup:
+    name: Setup Steps
+    runs-on: ubuntu-latest
+    outputs:
+      microservices: ${{ steps.set-outputs.outputs.microservices }}
+      cronjobs: ${{ steps.set-outputs.outputs.cronjobs }}
+      chart_hash: ${{ steps.check-chart.outputs.chart_hash }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+        with:
+          repository: roberto-mondello-dgt/cache-helm-test
+          # fetch-depth: 0
+
+      - id: check-chart
+        run: |
+          if [ -f "Chart.yaml" ]; then
+            chart_hash=$(sha256sum Chart.yaml | awk '{print $1}')
+          else
+            chart_hash="none"
+          fi
+          echo "chart_hash=$chart_hash" >> "$GITHUB_OUTPUT"
+          echo "$chart_hash" > /tmp/chart_hash
+
+      - id: calculate-hash
+        run: |
+          values_hash=$(find jobs microservices -type f -path "*/${{ inputs.environment }}/values.yaml" \
+            -exec sha256sum {} \; | sort | sha256sum | awk '{print $1}')
+          echo "values_hash=$values_hash" >> "$GITHUB_OUTPUT"
+          echo "$values_hash" > /tmp/values_hash
+
+      - name: Restore Cache
+        uses: actions/cache@v3
+        id: cache-restore
+        with:
+          path: /tmp/cache
+          key: cache-${{ inputs.environment }}-chart-${{ steps.check-chart.outputs.chart_hash }}-values-${{ steps.calculate-hash.outputs.values_hash }}
+
+      - id: set-outputs
+        run: |
+          if [ -d "microservices" ]; then
+            microservices=$(find microservices -type f -path "*/${{ inputs.environment }}/values.yaml" \
+              -exec dirname {} \; | awk -F'/' '{print $2}' | sort -u | jq -R -s -c 'split("\n")[:-1]')
+          else
+            microservices="[]"
+          fi
+          echo "microservices=$microservices" >> "$GITHUB_OUTPUT"
+
+          if [ -d "jobs" ]; then
+            cronjobs=$(find jobs -type f -path "*/${{ inputs.environment }}/values.yaml" \
+              -exec dirname {} \; | awk -F'/' '{print $2}' | sort -u | jq -R -s -c 'split("\n")[:-1]')
+          else
+            cronjobs="[]"
+          fi
+          echo "cronjobs=$cronjobs" >> "$GITHUB_OUTPUT"
+
+      - name: Save Cache
+        if: steps.cache-restore.outputs.cache-hit != 'true'
+        uses: actions/cache@v3
+        with:
+          path: /tmp/cache
+          key: cache-${{ inputs.environment }}-chart-${{ steps.check-chart.outputs.chart_hash }}-values-${{ steps.calculate-hash.outputs.values_hash }}
+
+  deploy_ms:
+    name: ${{ matrix.microservice }}
+    needs: workflow_setup
+    runs-on: ubuntu-latest
+    if: ${{ ! contains(needs.workflow_setup.outputs.microservices, '[]') }}
+    strategy:
+      matrix:
+        microservice: ${{ fromJson(needs.workflow_setup.outputs.microservices) }}
+    steps:
+      - name: Simulate Microservice Deploy
+        run: |
+          echo "::info::Simulating deploy for microservice: ${{ matrix.microservice }}"
+          echo "::info::Using values file: microservices/${{ matrix.microservice }}/${{ inputs.environment }}/values.yaml"
+
+  deploy_cj:
+    name: ${{ matrix.cronjob }}
+    needs: workflow_setup
+    runs-on: ubuntu-latest
+    if: ${{ ! contains(needs.workflow_setup.outputs.cronjobs, '[]') }}
+    strategy:
+      matrix:
+        cronjob: ${{ fromJson(needs.workflow_setup.outputs.cronjobs) }}
+    steps:
+      - name: Simulate Cronjob Deploy
+        run: |
+          echo "::info::Simulating deploy for cronjob: ${{ matrix.cronjob }}"
+          echo "::info::Using values file: jobs/${{ matrix.cronjob }}/${{ inputs.environment }}/values.yaml"

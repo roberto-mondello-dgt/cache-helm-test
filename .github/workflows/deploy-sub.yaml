@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Environment to simulate deploy against'
+        description: 'Environment to run apply against'
         required: true
         type: string
       timeout_seconds:
-        description: 'Simulation timeout in seconds'
+        description: 'Timeout in seconds'
         required: true
         type: number
 
@@ -33,7 +33,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: roberto-mondello-dgt/cache-helm-test
-          fetch-depth: 0
+          # fetch-depth: 0
 
       - id: calculate-hash
         run: |
