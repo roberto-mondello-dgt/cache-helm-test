@@ -15,6 +15,7 @@ on:
 defaults:
   run:
     shell: bash
+    working-directory: ./interop-core-deployment
 
 jobs:
   workflow_setup:
@@ -30,9 +31,13 @@ jobs:
           repository: roberto-mondello-dgt/cache-helm-test
           fetch-depth: 0
 
+      - name: Debug Directory Structure
+        run: |
+          echo "Current Directory Structure:"
+          find . -type f
+
       - id: check-chart
         run: |
-          cd ./interop-core-deployment
           if [ -f "Chart.yaml" ]; then
             chart_hash=$(sha256sum Chart.yaml | awk '{print $1}')
           else
@@ -40,9 +45,29 @@ jobs:
           fi
           echo "chart_hash=$chart_hash" >> "$GITHUB_OUTPUT"
 
+      - id: calculate-hash
+        run: |
+          files=$(find jobs microservices -type f -path "*/${{ inputs.environment }}/values.yaml" || true)
+          if [ -z "$files" ]; then
+            echo "No values.yaml files found for environment: ${{ inputs.environment }}."
+            values_hash="none"
+          else
+            values_hash=$(echo "$files" | xargs sha256sum | sort | sha256sum | awk '{print $1}')
+          fi
+          echo "values_hash=$values_hash" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare Cache Directory
+        run: mkdir -p /tmp/cache
+
+      - name: Restore Cache
+        uses: actions/cache@v3
+        id: cache-restore
+        with:
+          path: /tmp/cache
+          key: cache-${{ inputs.environment }}-chart-${{ steps.check-chart.outputs.chart_hash }}-values-${{ steps.calculate-hash.outputs.values_hash }}
+
       - id: set-outputs
         run: |
-          cd ./interop-core-deployment
           if [ -d "microservices" ]; then
             microservices=$(find microservices -type f -name "values.yaml" \
               -exec dirname {} \; | awk -F'/' '{print $2}' | sort -u | jq -R -s -c 'split("\n")[:-1]')
@@ -59,6 +84,13 @@ jobs:
           fi
           echo "cronjobs=$cronjobs" >> "$GITHUB_OUTPUT"
 
+      - name: Save Cache
+        if: steps.cache-restore.outputs.cache-hit != 'true'
+        uses: actions/cache@v3
+        with:
+          path: /tmp/cache
+          key: cache-${{ inputs.environment }}-chart-${{ steps.check-chart.outputs.chart_hash }}-values-${{ steps.calculate-hash.outputs.values_hash }}
+
   deploy_ms:
     name: Deploy Microservice - ${{ matrix.microservice }}
     needs: workflow_setup
@@ -68,33 +100,15 @@ jobs:
       matrix:
         microservice: ${{ fromJson(needs.workflow_setup.outputs.microservices) }}
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Calculate Values Hash
-        id: calculate-hash
-        run: |
-          cd ./interop-core-deployment
-          values_file="microservices/${{ matrix.microservice }}/${{ inputs.environment }}/values.yaml"
-          if [ -f "$values_file" ]; then
-            values_hash=$(sha256sum "$values_file" | awk '{print $1}')
-          else
-            values_hash="none"
-          fi
-          echo "values_hash=$values_hash" >> "$GITHUB_OUTPUT"
-
-      - name: Restore Cache
+      - name: Restore Cache for Microservice
         uses: actions/cache@v3
         id: cache-restore
         with:
           path: /tmp/cache
-          key: cache-${{ inputs.environment }}-ms-${{ matrix.microservice }}-chart-${{ needs.workflow_setup.outputs.chart_hash }}-values-${{ steps.calculate-hash.outputs.values_hash }}
+          key: cache-${{ inputs.environment }}-ms-${{ matrix.microservice }}-chart-${{ needs.workflow_setup.outputs.chart_hash }}-values-${{ needs.workflow_setup.outputs.values_hash }}
 
-      - name: Deploy Microservice
+      - name: Simulate Microservice Deploy
         run: |
-          cd ./interop-core-deployment
           values_file="microservices/${{ matrix.microservice }}/${{ inputs.environment }}/values.yaml"
           if [ -f "$values_file" ]; then
             echo "::info::Deploying microservice: ${{ matrix.microservice }} with values file $values_file"
@@ -108,13 +122,19 @@ jobs:
               CHART_VERSION="15.14.0"
               helm pull bitnami/$CHART_NAME --version $CHART_VERSION --untar
               helm package $CHART_NAME -d /tmp/cache
-              echo "::info::Helm chart packaged and stored in cache."
             else
               echo "::info::Using cached Helm chart for microservice: ${{ matrix.microservice }}"
             fi
           else
             echo "::warning::Values file not found for microservice: ${{ matrix.microservice }}. Skipping."
           fi
+
+      - name: Save Cache for Microservice
+        if: steps.cache-restore.outputs.cache-hit != 'true'
+        uses: actions/cache@v3
+        with:
+          path: /tmp/cache
+          key: cache-${{ inputs.environment }}-ms-${{ matrix.microservice }}-chart-${{ needs.workflow_setup.outputs.chart_hash }}-values-${{ needs.workflow_setup.outputs.values_hash }}
 
   deploy_cj:
     name: Deploy Cronjob - ${{ matrix.cronjob }}
@@ -125,33 +145,15 @@ jobs:
       matrix:
         cronjob: ${{ fromJson(needs.workflow_setup.outputs.cronjobs) }}
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Calculate Values Hash
-        id: calculate-hash
-        run: |
-          cd ./interop-core-deployment
-          values_file="jobs/${{ matrix.cronjob }}/${{ inputs.environment }}/values.yaml"
-          if [ -f "$values_file" ]; then
-            values_hash=$(sha256sum "$values_file" | awk '{print $1}')
-          else
-            values_hash="none"
-          fi
-          echo "values_hash=$values_hash" >> "$GITHUB_OUTPUT"
-
-      - name: Restore Cache
+      - name: Restore Cache for Cronjob
         uses: actions/cache@v3
         id: cache-restore
         with:
           path: /tmp/cache
-          key: cache-${{ inputs.environment }}-cj-${{ matrix.cronjob }}-chart-${{ needs.workflow_setup.outputs.chart_hash }}-values-${{ steps.calculate-hash.outputs.values_hash }}
+          key: cache-${{ inputs.environment }}-cj-${{ matrix.cronjob }}-chart-${{ needs.workflow_setup.outputs.chart_hash }}-values-${{ needs.workflow_setup.outputs.values_hash }}
 
-      - name: Deploy Cronjob
+      - name: Simulate Cronjob Deploy
         run: |
-          cd ./interop-core-deployment
           values_file="jobs/${{ matrix.cronjob }}/${{ inputs.environment }}/values.yaml"
           if [ -f "$values_file" ]; then
             echo "::info::Deploying cronjob: ${{ matrix.cronjob }} with values file $values_file"
@@ -165,10 +167,16 @@ jobs:
               CHART_VERSION="15.14.0"
               helm pull bitnami/$CHART_NAME --version $CHART_VERSION --untar
               helm package $CHART_NAME -d /tmp/cache
-              echo "::info::Helm chart packaged and stored in cache."
             else
               echo "::info::Using cached Helm chart for cronjob: ${{ matrix.cronjob }}"
             fi
           else
             echo "::warning::Values file not found for cronjob: ${{ matrix.cronjob }}. Skipping."
           fi
+
+      - name: Save Cache for Cronjob
+        if: steps.cache-restore.outputs.cache-hit != 'true'
+        uses: actions/cache@v3
+        with:
+          path: /tmp/cache
+          key: cache-${{ inputs.environment }}-cj-${{ matrix.cronjob }}-chart-${{ needs.workflow_setup.outputs.chart_hash }}-values-${{ needs.workflow_setup.outputs.values_hash }}
