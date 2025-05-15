@@ -102,14 +102,14 @@ jobs:
       matrix:
         microservice: ${{ fromJson(needs.workflow_setup.outputs.microservices) }}
     steps:
-      - name: Simulate Microservice Deploy
+      - name: Microservice Deploy
         run: |
+          cd ./interop-core-deployment
           values_file="microservices/${{ matrix.microservice }}/${{ inputs.environment }}/values.yaml"
           if [ -f "$values_file" ]; then
             echo "::info::Deploying microservice: ${{ matrix.microservice }} with values file $values_file"
-            echo "::info::Chart.yaml has changed. Building Helm chart."
-            mkdir -p /tmp/real-chart
-            cd /tmp/real-chart
+            mkdir -p /tmp/chart
+            cd /tmp/chart
             helm repo add bitnami https://charts.bitnami.com/bitnami
             helm repo update
             CHART_NAME="nginx"
@@ -130,14 +130,14 @@ jobs:
       matrix:
         cronjob: ${{ fromJson(needs.workflow_setup.outputs.cronjobs) }}
     steps:
-      - name: Simulate Cronjob Deploy
+      - name: Cronjob Deploy
         run: |
+          cd ./interop-core-deployment
           values_file="jobs/${{ matrix.cronjob }}/${{ inputs.environment }}/values.yaml"
           if [ -f "$values_file" ]; then
             echo "::info::Deploying cronjob: ${{ matrix.cronjob }} with values file $values_file"
-            echo "::info::Chart.yaml has changed. Building Helm chart."
-            mkdir -p /tmp/real-chart
-            cd /tmp/real-chart
+            mkdir -p /tmp/chart
+            cd /tmp/chart
             helm repo add bitnami https://charts.bitnami.com/bitnami
             helm repo update
             CHART_NAME="nginx"
