@@ -44,22 +44,22 @@ jobs:
             chart_hash="none"
           fi
           echo "chart_hash=$chart_hash" >> "$GITHUB_OUTPUT"
-          echo "$chart_hash" > /tmp/chart_hash
 
       - id: calculate-hash
         run: |
           files=$(find jobs microservices ./interop-core-deployment/ -type f -path "*/${{ inputs.environment }}/values.yaml" || true)
           if [ -z "$files" ]; then
-            echo "⚠️ No values.yaml files found for environment: ${{ inputs.environment }}. Proceeding without them."
+            echo "⚠️ No values.yaml files found for environment: ${{ inputs.environment }}."
             values_hash="none"
           else
-            echo "✅ Found the following values.yaml files for environment '${{ inputs.environment }}':"
+            echo "✅ Found values.yaml files:"
             echo "$files"
             values_hash=$(echo "$files" | xargs sha256sum | sort | sha256sum | awk '{print $1}')
           fi
-
           echo "values_hash=$values_hash" >> "$GITHUB_OUTPUT"
-          echo "$values_hash" > /tmp/values_hash
+
+      - name: Prepare Cache Directory
+        run: mkdir -p /tmp/cache
 
       - name: Restore Cache
         uses: actions/cache@v3
@@ -94,10 +94,10 @@ jobs:
           key: cache-${{ inputs.environment }}-chart-${{ steps.check-chart.outputs.chart_hash }}-values-${{ steps.calculate-hash.outputs.values_hash }}
 
   deploy_ms:
-    name: ${{ matrix.microservice }}
+    name: Deploy Microservice - ${{ matrix.microservice }}
     needs: workflow_setup
     runs-on: ubuntu-latest
-    if: ${{ !contains(needs.workflow_setup.outputs.microservices, '[]') }}
+    if: ${{ needs.workflow_setup.outputs.microservices != '[]' }}
     strategy:
       matrix:
         microservice: ${{ fromJson(needs.workflow_setup.outputs.microservices) }}
@@ -108,10 +108,10 @@ jobs:
           echo "::info::Using values file: microservices/${{ matrix.microservice }}/${{ inputs.environment }}/values.yaml"
 
   deploy_cj:
-    name: ${{ matrix.cronjob }}
+    name: Deploy Cronjob - ${{ matrix.cronjob }}
     needs: workflow_setup
     runs-on: ubuntu-latest
-    if: ${{ !contains(needs.workflow_setup.outputs.cronjobs, '[]') }}
+    if: ${{ needs.workflow_setup.outputs.cronjobs != '[]' }}
     strategy:
       matrix:
         cronjob: ${{ fromJson(needs.workflow_setup.outputs.cronjobs) }}
