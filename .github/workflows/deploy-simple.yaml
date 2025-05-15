@@ -16,9 +16,9 @@ defaults:
   run:
     shell: bash
     working-directory: .
+
 jobs:
   workflow_setup:
-    name: Setup Steps
     runs-on: ubuntu-latest
     outputs:
       microservices: ${{ steps.set-outputs.outputs.microservices }}
@@ -29,7 +29,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: roberto-mondello-dgt/cache-helm-test
-          # fetch-depth: 0
+          fetch-depth: 0
 
       - id: check-chart
         run: |
@@ -43,8 +43,13 @@ jobs:
 
       - id: calculate-hash
         run: |
-          values_hash=$(find jobs microservices -type f -path "*/${{ inputs.environment }}/values.yaml" \
-            -exec sha256sum {} \; | sort | sha256sum | awk '{print $1}')
+          files=$(find jobs microservices -type f -path "*/${{ inputs.environment }}/values.yaml" || true)
+          if [ -n "$files" ]; then
+            values_hash=$(echo "$files" | xargs sha256sum | sort | sha256sum | awk '{print $1}')
+          else
+            echo "No matching values.yaml files found for environment: ${{ inputs.environment }}"
+            values_hash="none"
+          fi
           echo "values_hash=$values_hash" >> "$GITHUB_OUTPUT"
           echo "$values_hash" > /tmp/values_hash
 
@@ -84,7 +89,7 @@ jobs:
     name: ${{ matrix.microservice }}
     needs: workflow_setup
     runs-on: ubuntu-latest
-    if: ${{ ! contains(needs.workflow_setup.outputs.microservices, '[]') }}
+    if: ${{ !contains(needs.workflow_setup.outputs.microservices, '[]') }}
     strategy:
       matrix:
         microservice: ${{ fromJson(needs.workflow_setup.outputs.microservices) }}
@@ -98,7 +103,7 @@ jobs:
     name: ${{ matrix.cronjob }}
     needs: workflow_setup
     runs-on: ubuntu-latest
-    if: ${{ ! contains(needs.workflow_setup.outputs.cronjobs, '[]') }}
+    if: ${{ !contains(needs.workflow_setup.outputs.cronjobs, '[]') }}
     strategy:
       matrix:
         cronjob: ${{ fromJson(needs.workflow_setup.outputs.cronjobs) }}
