@@ -25,7 +25,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: roberto-mondello-dgt/cache-helm-test
-          fetch-depth: 0
+          # fetch-depth: 0
 
       - name: Check Chart Hash
         id: check-chart
@@ -47,24 +47,24 @@ jobs:
           path: /tmp/cache
           key: cache-${{ inputs.environment }}-chart-${{ steps.check-chart.outputs.chart_hash }}
 
-      - name: Build and Cache Dummy Helm Chart
+      - name: Build and Cache Helm Chart
         if: steps.cache-restore.outputs.cache-hit != 'true' && steps.check-chart.outputs.chart_hash != 'none'
         run: |
-          echo "::info::Chart.yaml has changed. Building dummy Helm chart."
+            echo "::info::Chart.yaml has changed. Building Helm chart."
 
-          mkdir -p dummy-chart
-          cat <<EOF > dummy-chart/Chart.yaml
-          apiVersion: v2
-          name: dummy-service
-          version: 0.1.0
-          appVersion: "1.0"
-          EOF
+            mkdir -p /tmp/real-chart
+            cd /tmp/real-chart
 
-          mkdir -p dummy-chart/templates
-          echo "---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: dummy-config\n" > dummy-chart/templates/configmap.yaml
+            helm repo add bitnami https://charts.bitnami.com/bitnami
+            helm repo update
 
-          helm dependency build dummy-chart
-          helm package dummy-chart -d /tmp/cache
+            CHART_NAME="nginx"
+            CHART_VERSION="15.14.0"
+
+            helm pull bitnami/$CHART_NAME --version $CHART_VERSION --untar
+            helm package $CHART_NAME -d /tmp/cache
+
+            echo "::info::Helm chart packaged and stored in cache."
 
       - name: Save Cache
         if: steps.cache-restore.outputs.cache-hit != 'true'
