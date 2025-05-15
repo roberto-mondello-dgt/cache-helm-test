@@ -1,4 +1,4 @@
-name: Deploy - Simple
+name: Deploy - Chart MS CJ
 
 on:
   workflow_dispatch:
@@ -15,7 +15,7 @@ on:
 defaults:
   run:
     shell: bash
-    working-directory: .
+    working-directory: ./interop-core-deployment
 
 jobs:
   workflow_setup:
@@ -29,7 +29,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: roberto-mondello-dgt/cache-helm-test
-          fetch-depth: 0
+          # fetch-depth: 0
 
       - name: Debug Directory Structure
         run: |
@@ -49,10 +49,10 @@ jobs:
         run: |
           files=$(find jobs microservices ./interop-core-deployment/ -type f -path "*/${{ inputs.environment }}/values.yaml" || true)
           if [ -z "$files" ]; then
-            echo "⚠️ No values.yaml files found for environment: ${{ inputs.environment }}."
+            echo " No values.yaml files found for environment: ${{ inputs.environment }}."
             values_hash="none"
           else
-            echo "✅ Found values.yaml files:"
+            echo " Found values.yaml files:"
             echo "$files"
             values_hash=$(echo "$files" | xargs sha256sum | sort | sha256sum | awk '{print $1}')
           fi
@@ -104,8 +104,22 @@ jobs:
     steps:
       - name: Simulate Microservice Deploy
         run: |
-          echo "::info::Simulating deploy for microservice: ${{ matrix.microservice }}"
-          echo "::info::Using values file: microservices/${{ matrix.microservice }}/${{ inputs.environment }}/values.yaml"
+          values_file="microservices/${{ matrix.microservice }}/${{ inputs.environment }}/values.yaml"
+          if [ -f "$values_file" ]; then
+            echo "::info::Deploying microservice: ${{ matrix.microservice }} with values file $values_file"
+            echo "::info::Chart.yaml has changed. Building Helm chart."
+            mkdir -p /tmp/real-chart
+            cd /tmp/real-chart
+            helm repo add bitnami https://charts.bitnami.com/bitnami
+            helm repo update
+            CHART_NAME="nginx"
+            CHART_VERSION="15.14.0"
+            helm pull bitnami/$CHART_NAME --version $CHART_VERSION --untar
+            helm package $CHART_NAME -d /tmp/cache
+            echo "::info::Helm chart packaged and stored in cache."
+          else
+            echo "::warning::Values file not found for microservice: ${{ matrix.microservice }}. Skipping."
+          fi
 
   deploy_cj:
     name: Deploy Cronjob - ${{ matrix.cronjob }}
@@ -118,5 +132,19 @@ jobs:
     steps:
       - name: Simulate Cronjob Deploy
         run: |
-          echo "::info::Simulating deploy for cronjob: ${{ matrix.cronjob }}"
-          echo "::info::Using values file: jobs/${{ matrix.cronjob }}/${{ inputs.environment }}/values.yaml"
+          values_file="jobs/${{ matrix.cronjob }}/${{ inputs.environment }}/values.yaml"
+          if [ -f "$values_file" ]; then
+            echo "::info::Deploying cronjob: ${{ matrix.cronjob }} with values file $values_file"
+            echo "::info::Chart.yaml has changed. Building Helm chart."
+            mkdir -p /tmp/real-chart
+            cd /tmp/real-chart
+            helm repo add bitnami https://charts.bitnami.com/bitnami
+            helm repo update
+            CHART_NAME="nginx"
+            CHART_VERSION="15.14.0"
+            helm pull bitnami/$CHART_NAME --version $CHART_VERSION --untar
+            helm package $CHART_NAME -d /tmp/cache
+            echo "::info::Helm chart packaged and stored in cache."
+          else
+            echo "::warning::Values file not found for cronjob: ${{ matrix.cronjob }}. Skipping."
+          fi
