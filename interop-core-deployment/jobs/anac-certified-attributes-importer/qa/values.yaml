@@ -13,7 +13,7 @@ configmap:
   INTERNAL_JWT_AUDIENCE: "qa.interop.pagopa.it/internal"
   INTERNAL_JWT_SECONDS_DURATION: "1800"
   ANAC_TENANT_ID: "e99c1081-8fcb-4701-a461-ac2725b18fe7"
-  RECORDS_PROCESS_BATCH_SIZE: "100"
+  RECORDS_PROCESS_BATCH_SIZE: "101"
 
 cronjob:
   schedule: "15 5,11,17,23 * * *"
