@@ -31,7 +31,7 @@ jobs:
         id: check-chart
         run: |
           if [ -f "Chart.yaml" ]; then
-            chart_hash=$(sha256sum Chart.yaml | awk '{print $1}')
+            chart_hash=$(sha256sum cache-helm-test/interop-core-deployment/Chart.yaml | awk '{print $1}')
           else
             chart_hash="none"
           fi
