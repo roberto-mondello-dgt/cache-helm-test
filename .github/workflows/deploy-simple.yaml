@@ -48,14 +48,16 @@ jobs:
 
       - id: calculate-hash
         run: |
-          files=$(find jobs microservices -type f -name "values.yaml")
+          files=$(find jobs microservices ./interop-core-deployment/ -type f -path "*/${{ inputs.environment }}/values.yaml" || true)
           if [ -z "$files" ]; then
-            echo "❌ No values.yaml files found!"
-            exit 1
+            echo "⚠️ No values.yaml files found for environment: ${{ inputs.environment }}. Proceeding without them."
+            values_hash="none"
+          else
+            echo "✅ Found the following values.yaml files for environment '${{ inputs.environment }}':"
+            echo "$files"
+            values_hash=$(echo "$files" | xargs sha256sum | sort | sha256sum | awk '{print $1}')
           fi
 
-          values_hash=$(echo "$files" | xargs sha256sum | sort | sha256sum | awk '{print $1}')
-          echo "✅ Found values.yaml files"
           echo "values_hash=$values_hash" >> "$GITHUB_OUTPUT"
           echo "$values_hash" > /tmp/values_hash
 
