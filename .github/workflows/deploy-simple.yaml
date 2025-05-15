@@ -31,6 +31,11 @@ jobs:
           repository: roberto-mondello-dgt/cache-helm-test
           fetch-depth: 0
 
+      - name: Debug Directory Structure
+        run: |
+          echo "🏗️ Current Directory Structure:"
+          find . -type f
+
       - id: check-chart
         run: |
           if [ -f "Chart.yaml" ]; then
@@ -43,13 +48,14 @@ jobs:
 
       - id: calculate-hash
         run: |
-          files=$(find jobs microservices -type f -path "*/${{ inputs.environment }}/values.yaml" || true)
-          if [ -n "$files" ]; then
-            values_hash=$(echo "$files" | xargs sha256sum | sort | sha256sum | awk '{print $1}')
-          else
-            echo "No matching values.yaml files found for environment: ${{ inputs.environment }}"
-            values_hash="none"
+          files=$(find jobs microservices -type f -name "values.yaml")
+          if [ -z "$files" ]; then
+            echo "❌ No values.yaml files found!"
+            exit 1
           fi
+
+          values_hash=$(echo "$files" | xargs sha256sum | sort | sha256sum | awk '{print $1}')
+          echo "✅ Found values.yaml files"
           echo "values_hash=$values_hash" >> "$GITHUB_OUTPUT"
           echo "$values_hash" > /tmp/values_hash
 
@@ -63,7 +69,7 @@ jobs:
       - id: set-outputs
         run: |
           if [ -d "microservices" ]; then
-            microservices=$(find microservices -type f -path "*/${{ inputs.environment }}/values.yaml" \
+            microservices=$(find microservices -type f -name "values.yaml" \
               -exec dirname {} \; | awk -F'/' '{print $2}' | sort -u | jq -R -s -c 'split("\n")[:-1]')
           else
             microservices="[]"
@@ -71,7 +77,7 @@ jobs:
           echo "microservices=$microservices" >> "$GITHUB_OUTPUT"
 
           if [ -d "jobs" ]; then
-            cronjobs=$(find jobs -type f -path "*/${{ inputs.environment }}/values.yaml" \
+            cronjobs=$(find jobs -type f -name "values.yaml" \
               -exec dirname {} \; | awk -F'/' '{print $2}' | sort -u | jq -R -s -c 'split("\n")[:-1]')
           else
             cronjobs="[]"
