@@ -1,4 +1,4 @@
-name: Prepare - Solo Chart (Public Charts)
+name: deploy-chart-only
 
 on:
   workflow_dispatch:
