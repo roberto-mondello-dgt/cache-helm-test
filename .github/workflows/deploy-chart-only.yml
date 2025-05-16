@@ -1,4 +1,4 @@
-name: Deploy - Solo Chart (Public Charts)
+name: Prepare - Solo Chart (Public Charts)
 
 on:
   workflow_dispatch:
@@ -18,7 +18,7 @@ defaults:
     working-directory: ./interop-core-deployment
 
 jobs:
-  chart_cache_and_deploy:
+  chart_cache:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -66,12 +66,3 @@ jobs:
         with:
           path: ./cache
           key: cache-${{ inputs.environment }}-chart-${{ steps.check-chart.outputs.chart_hash }}
-
-      - name: Deploy Public Helm Chart
-        run: |
-          echo "::info::Deploying public Helm chart..."
-
-          CHART_PACKAGE=$(ls ./cache/*.tgz | head -n 1)
-          helm upgrade --install my-release "$CHART_PACKAGE" --namespace default
-
-          echo "::info::Helm chart deployment completed."
