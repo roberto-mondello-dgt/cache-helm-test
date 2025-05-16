@@ -7,10 +7,12 @@ on:
         description: 'Environment to run apply against'
         required: true
         type: string
+        default: 'qa'
       timeout_seconds:
         description: 'Timeout in seconds'
         required: true
         type: number
+        default: 150
 
 defaults:
   run:
