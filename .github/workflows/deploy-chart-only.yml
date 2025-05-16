@@ -36,7 +36,7 @@ jobs:
       - name: Compute Chart Hash
         id: check-chart
         run: |
-          CHART_PATH="${{ github.workspace }}/Chart.yaml"
+          CHART_PATH="${{ github.workspace }}/interop-core-deployment/Chart.yaml"
           if [ ! -f "$CHART_PATH" ]; then
             echo "Chart.yaml not found at $CHART_PATH"
             exit 1
