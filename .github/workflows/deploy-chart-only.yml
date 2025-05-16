@@ -1,4 +1,4 @@
-name: Deploy - Solo Chart
+name: Deploy - Solo Chart (Public Charts)
 
 on:
   workflow_dispatch:
@@ -28,25 +28,26 @@ jobs:
 
       - name: Compute Chart Hash
         id: check-chart
-        run: echo "chart_hash=${{ hashFiles('charts/Chart.yaml') }}" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "chart_hash=${{ hashFiles('charts/Chart.yaml') }}" >> "$GITHUB_OUTPUT"
 
       - name: Prepare Cache Directory
-        run: mkdir -p charts/cache
+        run: mkdir -p ./cache
 
       - name: Restore Cache
         uses: actions/cache@v3
         id: cache-restore
         with:
-          path: charts/cache
+          path: ./cache
           key: cache-${{ inputs.environment }}-chart-${{ steps.check-chart.outputs.chart_hash }}
 
-      - name: Build and Cache Helm Chart
+      - name: Build and Cache Helm Chart (Public)
         if: steps.cache-restore.outputs.cache-hit != 'true'
         run: |
-          echo "::info::Chart.yaml has changed or no cache found. Building Helm chart."
+          echo "::info::Chart.yaml has changed or no cache found. Downloading and packaging public Helm chart."
 
-          mkdir -p charts/real-chart
-          cd charts/real-chart
+          mkdir -p ./real-chart
+          cd ./real-chart
 
           helm repo add bitnami https://charts.bitnami.com/bitnami
           helm repo update
@@ -63,5 +64,14 @@ jobs:
         if: steps.cache-restore.outputs.cache-hit != 'true'
         uses: actions/cache@v3
         with:
-          path: charts/cache
+          path: ./cache
           key: cache-${{ inputs.environment }}-chart-${{ steps.check-chart.outputs.chart_hash }}
+
+      - name: Deploy Public Helm Chart
+        run: |
+          echo "::info::Deploying public Helm chart..."
+
+          CHART_PACKAGE=$(ls ./cache/*.tgz | head -n 1)
+          helm upgrade --install my-release "$CHART_PACKAGE" --namespace default
+
+          echo "::info::Helm chart deployment completed."
