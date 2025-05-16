@@ -1,4 +1,4 @@
-name: deploy-chart-only
+name: Deploy - Solo Chart
 
 on:
   workflow_dispatch:
@@ -7,12 +7,10 @@ on:
         description: 'Environment to run apply against'
         required: true
         type: string
-        default: 'qa'
       timeout_seconds:
         description: 'Timeout in seconds'
         required: true
         type: number
-        default: 150
 
 defaults:
   run:
@@ -20,7 +18,7 @@ defaults:
     working-directory: ./interop-core-deployment
 
 jobs:
-  chart_cache:
+  chart_cache_and_deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -30,26 +28,25 @@ jobs:
 
       - name: Compute Chart Hash
         id: check-chart
-        run: |
-          echo "chart_hash=${{ hashFiles('charts/Chart.yaml') }}" >> "$GITHUB_OUTPUT"
+        run: echo "chart_hash=${{ hashFiles('../Chart.yaml') }}" >> "$GITHUB_OUTPUT"
 
       - name: Prepare Cache Directory
-        run: mkdir -p ./cache
+        run: mkdir -p ../cache
 
       - name: Restore Cache
         uses: actions/cache@v3
         id: cache-restore
         with:
-          path: ./cache
+          path: ../cache
           key: cache-${{ inputs.environment }}-chart-${{ steps.check-chart.outputs.chart_hash }}
 
-      - name: Build and Cache Helm Chart (Public)
+      - name: Build and Cache Helm Chart
         if: steps.cache-restore.outputs.cache-hit != 'true'
         run: |
-          echo "::info::Chart.yaml has changed or no cache found. Downloading and packaging public Helm chart."
+          echo "::info::Chart.yaml has changed or no cache found. Building Helm chart."
 
-          mkdir -p ./real-chart
-          cd ./real-chart
+          mkdir -p ../real-chart
+          cd ../real-chart
 
           helm repo add bitnami https://charts.bitnami.com/bitnami
           helm repo update
@@ -66,5 +63,5 @@ jobs:
         if: steps.cache-restore.outputs.cache-hit != 'true'
         uses: actions/cache@v3
         with:
-          path: ./cache
+          path: ../cache
           key: cache-${{ inputs.environment }}-chart-${{ steps.check-chart.outputs.chart_hash }}
