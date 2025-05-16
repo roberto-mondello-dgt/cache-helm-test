@@ -30,7 +30,13 @@ jobs:
 
       - name: Compute Chart Hash
         id: check-chart
-        run: echo "chart_hash=${{ hashFiles('../Chart.yaml') }}" >> "$GITHUB_OUTPUT"
+        run: |
+          CHART_PATH="${{ github.workspace }}/Chart.yaml"
+          if [ ! -f "$CHART_PATH" ]; then
+            echo "Chart.yaml not found at $CHART_PATH"
+            exit 1
+          fi
+          echo "chart_hash=$(sha256sum "$CHART_PATH" | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
 
       - name: Prepare Cache Directory
         run: mkdir -p ../cache
