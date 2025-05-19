@@ -29,7 +29,7 @@ jobs:
           path: interop-core-deployment
 
       - name: Visualize tree structure
-        run: find / | sed -e 's/[^-][^\/]*\//  |/g' -e 's/|\([^ ]\)/|-\1/'
+        run: tree /
 
       - name: Calculate Chart.yaml hash
         id: check-chart
