@@ -29,12 +29,13 @@ jobs:
           path: interop-core-deployment
 
       - name: Visualize tree structure
-        run: ls -la
+        run: find Chart.yaml
 
       - name: Calculate Chart.yaml hash
         id: check-chart
         run: |
           echo "chart_hash=${{ hashFiles('**/Chart.yaml') }}" >> "$GITHUB_OUTPUT"
+          find / -type f -name "Chart.yaml" 2>/dev/null
 
       - name: Prepare Charts Directory
         run: mkdir -p charts
