@@ -17,7 +17,7 @@ on:
 defaults:
   run:
     shell: bash
-    working-directory: ./interop-core-deployment
+    #working-directory: ./interop-core-deployment
 
 jobs:
   chart_cache_and_deploy:
