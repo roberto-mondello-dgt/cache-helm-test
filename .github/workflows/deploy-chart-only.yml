@@ -32,7 +32,7 @@ jobs:
       - name: Calculate Chart.yaml hash
         id: check-chart
         run: |
-          echo "chart_hash=${{ hashFiles('Chart.yaml') }}" >> "$GITHUB_OUTPUT"
+          echo "chart_hash=${{ hashFiles('interop-core-deployment/Chart.yaml') }}" >> "$GITHUB_OUTPUT"
 
       - name: Prepare Charts Directory
         run: mkdir -p ../charts
