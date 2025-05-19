@@ -28,8 +28,6 @@ jobs:
           repository: roberto-mondello-dgt/cache-helm-test
           path: interop-core-deployment
 
-      - name: Visualize tree structure
-        run: find Chart.yaml
 
       - name: Calculate Chart.yaml hash
         id: check-chart
