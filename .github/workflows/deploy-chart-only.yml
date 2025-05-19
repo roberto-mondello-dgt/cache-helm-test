@@ -12,51 +12,41 @@ on:
         description: 'Timeout in seconds'
         required: true
         type: number
-        default: 150
+        default: 120
 
 defaults:
   run:
     shell: bash
+    working-directory: ./interop-core-deployment
 
 jobs:
   chart_cache_and_deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code into interop-core-deployment
+      - name: Checkout Code
         uses: actions/checkout@v3
         with:
           repository: roberto-mondello-dgt/cache-helm-test
-          path: interop-core-deployment
-
-      - name: Debug repository content
-        run: |
-          cd interop-core-deployment
-          echo "Working dir: $(pwd)"
-          ls -la
 
       - name: Calculate Chart.yaml hash
         id: check-chart
         run: |
-          cd interop-core-deployment
-          # hashFiles restituisce "" se il file non esiste
           echo "chart_hash=${{ hashFiles('Chart.yaml') }}" >> "$GITHUB_OUTPUT"
 
       - name: Prepare Charts Directory
-        run: mkdir -p interop-core-deployment/charts
+        run: mkdir -p ../charts
 
       - name: Restore Cache
         id: cache-restore
         uses: actions/cache@v3
         with:
-          path: interop-core-deployment/charts
+          path: ../charts
           key: cache-${{ inputs.environment }}-chart-${{ steps.check-chart.outputs.chart_hash }}
 
       - name: Build and Cache Helm Chart
         if: steps.cache-restore.outputs.cache-hit != 'true'
         run: |
-          cd interop-core-deployment
           echo "::info::Chart.yaml has changed or no cache found. Building Helm chart."
-
           mkdir -p real-chart
           cd real-chart
 
@@ -69,11 +59,11 @@ jobs:
           helm pull bitnami/$CHART_NAME --version $CHART_VERSION --untar
           helm package $CHART_NAME -d ../charts
 
-          echo "::info::Helm chart packaged and stored in ./charts."
+          echo "::info::Helm chart packaged and stored in ../charts."
 
       - name: Save Cache
         if: steps.cache-restore.outputs.cache-hit != 'true'
         uses: actions/cache@v3
         with:
-          path: interop-core-deployment/charts
+          path: ../charts
           key: cache-${{ inputs.environment }}-chart-${{ steps.check-chart.outputs.chart_hash }}
