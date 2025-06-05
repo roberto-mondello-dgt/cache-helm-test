@@ -15,7 +15,6 @@ jobs:
         environment: [dev, qa, vapt]  # Qui puoi aggiungere altri env se vuoi!
     steps:
       - name: EExecuting validation
-        uses: roberto-mondello-dgt/interop-core-deployment/actions/deployment-values-validation@v1
+        uses: roberto-mondello-dgt/interop-core-deployment/actions/deployment-values-validation@main
         with:
           environment: ${{ matrix.environment }}
-          #infra_commons_tag: "v1.0.0"  # Cambia con il tag reale di interop-infra-commons!
