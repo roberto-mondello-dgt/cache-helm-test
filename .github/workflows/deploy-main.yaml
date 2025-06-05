@@ -22,6 +22,30 @@
 ##    uses: ./.github/workflows/pr-validation-sub-print-summary.yaml
 ##
 
+#name: PR Validation - Main Starter
+#
+#on:
+#  workflow_dispatch:
+#
+#permissions:
+#  id-token: write
+#  contents: read
+#
+#jobs:
+#  validation:
+#    name: "Validation – ${{ matrix.environment }}"
+#    runs-on: ubuntu-latest
+#    strategy:
+#      matrix:
+#        environment: [dev, qa, vapt]
+#    steps:
+#      - uses: actions/checkout@v4
+#      - name: Executing validation
+#        uses: roberto-mondello-dgt/interop-core-deployment/actions/deployment-values-validation@v1
+#        with:
+#          environment: ${{ matrix.environment }}
+
+
 name: PR Validation - Main Starter
 
 on:
@@ -33,14 +57,13 @@ permissions:
 
 jobs:
   validation:
-    name: "Validation – ${{ matrix.environment }}"
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        environment: [dev, qa, vapt]
+        environment: [dev, qa, vapt]  # Qui puoi aggiungere altri env se vuoi!
     steps:
-      - uses: actions/checkout@v4
-      - name: Executing validation
+      - name: EExecuting validation
         uses: roberto-mondello-dgt/interop-core-deployment/actions/deployment-values-validation@v1
         with:
           environment: ${{ matrix.environment }}
+          #infra_commons_tag: "v1.0.0"  # Cambia con il tag reale di interop-infra-commons!
