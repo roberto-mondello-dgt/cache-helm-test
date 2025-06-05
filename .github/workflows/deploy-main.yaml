@@ -41,6 +41,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Executing validation
-        uses: roberto-mondello-dgt/interop-core-deployment/actions/deployment-values-validation@main
+        uses: roberto-mondello-dgt/interop-core-deployment/actions/deployment-values-validation@v1
         with:
           environment: ${{ matrix.environment }}
