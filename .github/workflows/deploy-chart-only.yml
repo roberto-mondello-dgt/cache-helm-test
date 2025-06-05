@@ -59,7 +59,7 @@ jobs:
           helm pull bitnami/$CHART_NAME --version $CHART_VERSION --untar
           helm package $CHART_NAME -d ../charts
 
-          echo "::info::Helm chart packaged and stored in ../charts."
+          echo "::info::Helm chart packaged and stored in ./charts."
 
       - name: Save Cache
         if: steps.cache-restore.outputs.cache-hit != 'true'
