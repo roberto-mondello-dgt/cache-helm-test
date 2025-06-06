@@ -89,7 +89,7 @@ runs:
           echo "Templating microservice: $MICROSERVICE_NAME"
           echo "-------------------------------------"
           echo "parameters:"
-          echo "ms: $MICROSERVICE_NAME""
+          echo "ms: $MICROSERVICE_NAME"
           echo "env: ${{ inputs.environment }}"
           echo "images: $PROJECT_DIR/commons/${{ inputs.environment }}/images.yaml"
           echo "-------------------------------------"
