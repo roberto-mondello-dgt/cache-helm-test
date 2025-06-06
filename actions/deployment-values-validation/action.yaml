@@ -25,14 +25,6 @@ runs:
         fetch-depth: 0
         sparse-checkout: 'scripts/helm'
         ref: ${{ inputs.infra_commons_tag }}
-    
-    - name: Debug directory structure
-      shell: bash
-      run: |
-        echo "Current directory: $(pwd)"
-        echo "Directory structure:"
-        find . -name "Chart.yaml" | head -20
-        ls -la
 
     - name: Helm Chart Linting - Microservice
       shell: bash
