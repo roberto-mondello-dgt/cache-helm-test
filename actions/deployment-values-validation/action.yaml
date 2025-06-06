@@ -68,8 +68,6 @@ runs:
         chmod +x kube-linter-linux/kube-linter
         sudo mv kube-linter-linux/kube-linter /usr/local/bin/kube-linter
 
-kube-linter --version
-
 
         kube-linter --version
 
