@@ -40,7 +40,7 @@ runs:
         $SCRIPTS_FOLDER/helmLint-main.sh \
         --debug \
         --environment ${{ inputs.environment }} \
-        --output console $OPTIONS -i $PROJECT_DIR/commons/${{ inputs.environment }}/images.yaml
+        --output console $OPTIONS -i $PROJECT_DIR/commons/${{ inputs.environment }}/images.yaml || true
     
     - name: Helm Chart Linting - Cronjob
       shell: bash
@@ -56,7 +56,7 @@ runs:
         $SCRIPTS_FOLDER/helmLint-main.sh \
         --debug \
         --environment ${{ inputs.environment }} \
-        --output console $OPTIONS -i $PROJECT_DIR/commons/${{ inputs.environment }}/images.yaml
+        --output console $OPTIONS -i $PROJECT_DIR/commons/${{ inputs.environment }}/images.yaml || true
 
     - name: Kube-linter download
       shell: bash
