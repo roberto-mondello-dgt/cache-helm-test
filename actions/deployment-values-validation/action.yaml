@@ -11,10 +11,6 @@ inputs:
     required: false
     default: ''
 
-defaults:
-  run:
-    shell: bash
-
 runs:
   using: 'composite'
   steps:
@@ -28,6 +24,7 @@ runs:
         ref: ${{ inputs.infra_commons_tag }}
     
     - name: Debug directory structure
+      shell: bash
       run: |
         echo "Current directory: $(pwd)"
         echo "Directory structure:"
@@ -35,6 +32,7 @@ runs:
         ls -la
 
     - name: Helm Chart Linting - Microservice
+      shell: bash
       env: 
         CHART_TYPE: microservice
         SCRIPTS_FOLDER: "./interop-infra-commons/scripts/helm"
@@ -47,6 +45,7 @@ runs:
         $SCRIPTS_FOLDER/helmLint-main.sh --debug --environment ${{ inputs.environment }} --output console $OPTIONS -i $PROJECT_DIR/commons/${{ inputs.environment }}/images.yaml
     
     - name: Helm Chart Linting - Cronjob
+      shell: bash
       env: 
         CHART_TYPE: cronjob
         SCRIPTS_FOLDER: "./interop-infra-commons/scripts/helm"
@@ -59,6 +58,7 @@ runs:
         $SCRIPTS_FOLDER/helmLint-main.sh --debug --environment ${{ inputs.environment }} --output console $OPTIONS -i $PROJECT_DIR/commons/${{ inputs.environment }}/images.yaml
 
     - name: Kube-linter download
+      shell: bash
       run: |
         set -euo pipefail
 
@@ -70,6 +70,7 @@ runs:
         kube-linter --version
 
     - name: Get Microservices List and Template & Lint
+      shell: bash
       env:
         TARGET_ENVIRONMENT: ${{ inputs.environment }}
         SCRIPTS_FOLDER: "./interop-infra-commons/scripts/helm"
@@ -102,6 +103,7 @@ runs:
         fi
 
     - name: Get Cronjobs List and Template & Lint
+      shell: bash
       env:
         TARGET_ENVIRONMENT: ${{ inputs.environment }}
         SCRIPTS_FOLDER: "./interop-infra-commons/scripts/helm"
