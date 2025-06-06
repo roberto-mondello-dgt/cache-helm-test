@@ -99,7 +99,8 @@ runs:
             --environment ${{ inputs.environment }} \
             --microservice $MICROSERVICE_NAME \
             -i $PROJECT_DIR/commons/${{ inputs.environment }}/images.yaml \
-            --output /tmp/helm-template-${MICROSERVICE_NAME}.yaml
+            --output console > /tmp/helm-template-${MICROSERVICE_NAME}.yaml
+
 
           # Linting 
           echo "Linting microservice: $MICROSERVICE_NAME"
