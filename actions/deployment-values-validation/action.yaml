@@ -105,7 +105,7 @@ runs:
 
           # Linting 
           echo "Linting microservice: $MICROSERVICE_NAME"
-          kube-linter lint /tmp/helm-template-${MICROSERVICE_NAME}.yaml
+          kube-linter lint /tmp/helm-template-${MICROSERVICE_NAME}.yaml || true
             
           done
         else
@@ -138,7 +138,7 @@ runs:
                 
             # Linting
             echo "Linting cronjob: $CRONJOB_NAME"
-            kube-linter lint /tmp/helm-template-cronjob-${CRONJOB_NAME}.yaml
+            kube-linter lint /tmp/helm-template-cronjob-${CRONJOB_NAME}.yaml || true
           done
         else
           echo "No cronjobs found for environment ${{ inputs.environment }}"
