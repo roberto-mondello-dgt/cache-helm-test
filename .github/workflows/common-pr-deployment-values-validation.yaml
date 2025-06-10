@@ -100,22 +100,24 @@ jobs:
           
           export PROJECT_DIR=$(pwd)
           
+          
           if [[ -n "$MICROSERVICES" ]]; then
+          set +e
             for MICROSERVICE_NAME in $MICROSERVICES; do
+            TEMPLATE_OUTPUT_PATH="/tmp/helm-template-${MICROSERVICE_NAME}.yaml"
+              $SCRIPTS_FOLDER/helmTemplate-svc-single.sh \
+                --debug \
+                --environment ${{ inputs.environment }} \
+                --microservice $MICROSERVICE_NAME \
+                -i $PROJECT_DIR/commons/${{ inputs.environment }}/images.yaml \
+                --output console > $TEMPLATE_OUTPUT_PATH
 
-          $SCRIPTS_FOLDER/helmTemplate-svc-single.sh \
-            --debug \
-            --environment ${{ inputs.environment }} \
-            --microservice $MICROSERVICE_NAME \
-            -i $PROJECT_DIR/commons/${{ inputs.environment }}/images.yaml \
-            --output console > /tmp/helm-template-${MICROSERVICE_NAME}.yaml || true
 
-
-          # Linting 
-          echo "Linting microservice: $MICROSERVICE_NAME"
-          kube-linter lint /tmp/helm-template-${MICROSERVICE_NAME}.yaml || true
+              # Linting 
+              echo "Linting microservice: $MICROSERVICE_NAME"
+              kube-linter lint $TEMPLATE_OUTPUT_PATH
             
-          done
+            done
           else
                 echo "No microservices found for environment ${{ inputs.environment }}"
           fi
@@ -163,19 +165,21 @@ jobs:
           export PROJECT_DIR=$(pwd)
 
           if [[ -n "$CRONJOBS" ]]; then
+            set +e
             for CRONJOB_NAME in $CRONJOBS; do
+              TEMPLATE_OUTPUT_PATH="/tmp/helm-template-cronjob-${CRONJOB_NAME}.yaml"
 
-          $SCRIPTS_FOLDER/helmTemplate-cron-single.sh \
-            --debug \
-            --environment ${{ inputs.environment }} \
-            --job $CRONJOB_NAME \
-            -i $PROJECT_DIR/commons/${{ inputs.environment }}/images.yaml \
-            --output console > /tmp/helm-template-cronjob-${CRONJOB_NAME}.yaml || true
+              $SCRIPTS_FOLDER/helmTemplate-cron-single.sh \
+                --debug \
+                --environment ${{ inputs.environment }} \
+                --job $CRONJOB_NAME \
+                -i $PROJECT_DIR/commons/${{ inputs.environment }}/images.yaml \
+                --output console > TEMPLATE_OUTPUT_PATH
 
-
-          # Linting 
-          echo "Linting microservice: $CRONJOB_NAME"
-          kube-linter lint /tmp/helm-template-${CRONJOB_NAME}.yaml || true
+              
+              # Linting 
+              echo "Linting microservice: $CRONJOB_NAME"
+              kube-linter lint /TEMPLATE_OUTPUT_PATH
             
           done
           else
