@@ -150,7 +150,6 @@ jobs:
             exit 1
           else
             echo "::notice::All microservices passed validation successfully"
-            
           fi
 
   cronjobs_validation:
@@ -240,6 +239,5 @@ jobs:
             echo "FAILED_CRONJOBS=$FAILED_CRONJOBS" >> $GITHUB_ENV
             exit 1
           else
-            echo "::notice::All cronjobs passed validation successfully"
-            
+            echo "::notice::All cronjobs passed validation successfully"   
           fi
