@@ -145,8 +145,6 @@ jobs:
                   
           if [[ $VALIDATION_ERROR_FLAG -eq 1 ]]; then
             echo "::error::Some microservices failed validation. Failed items: $FAILED_MICROSERVICES"
-            echo "MICROSERVICES_VALIDATION_FAILED=true" >> $GITHUB_ENV
-            echo "FAILED_MICROSERVICES=$FAILED_MICROSERVICES" >> $GITHUB_ENV
             exit 1
           else
             echo "::notice::All microservices passed validation successfully"
