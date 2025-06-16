@@ -1,4 +1,4 @@
-name: Validation Steps (sub) - reusable workflow
+name: Validation Steps (sub)
 
 on: 
   workflow_call:
@@ -6,6 +6,9 @@ on:
       environment:
         description: 'Environment to run tests against'
         required: true
+        type: string
+      infra_commons_tag:
+        required: false
         type: string
 
 defaults:
@@ -35,7 +38,7 @@ jobs:
           path: interop-infra-commons 
           fetch-depth: 0
           sparse-checkout: 'scripts/helm'
-          ref: ${{ vars.INFRA_COMMONS_TAG }}
+          ref: ${{ inputs.infra_commons_tag || 'main'}}
 
       - name: Helm Chart Linting
         id: helm_lint
@@ -74,7 +77,7 @@ jobs:
           path: interop-infra-commons 
           fetch-depth: 0
           sparse-checkout: 'scripts/helm'
-          ref: ${{ vars.INFRA_COMMONS_TAG }}
+          ref: ${{ inputs.infra_commons_tag || 'main' }}
 
       - name: Kube-linter download
         run: |
@@ -165,7 +168,7 @@ jobs:
           path: interop-infra-commons 
           fetch-depth: 0
           sparse-checkout: 'scripts/helm'
-          ref: ${{ vars.INFRA_COMMONS_TAG }}
+          ref: ${{ inputs.infra_commons_tag || 'main' }}
 
       - name: Kube-linter download
         run: |
